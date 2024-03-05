@@ -4,12 +4,12 @@ import torch
 import functools
 
 import folder_paths
-import comfy.model_management
-from comfy.model_patcher import ModelPatcher
+import model_management
+from model_patcher import ModelPatcher
 from folder_paths import get_folder_paths
-from comfy.utils import load_torch_file
-from comfy_extras.nodes_compositing import JoinImageWithAlpha
-from comfy.conds import CONDRegular
+from utils import load_torch_file
+from nodes_compositing import JoinImageWithAlpha
+from conds import CONDRegular
 from .lib_layerdiffusion.utils import (
     load_file_from_url,
     to_lora_patch_dict,
