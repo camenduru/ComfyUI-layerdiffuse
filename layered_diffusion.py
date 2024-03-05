@@ -56,7 +56,7 @@ def calculate_weight_adjust_channel(func):
                     print(
                         f"Merged with {key} channel changed from {weight.shape} to {new_shape}"
                     )
-                    new_diff = alpha * comfy.model_management.cast_to_device(
+                    new_diff = alpha * model_management.cast_to_device(
                         w1, weight.device, weight.dtype
                     )
                     new_weight = torch.zeros(size=new_shape).to(weight)
@@ -111,10 +111,10 @@ class LayeredDiffusionDecode:
             )
             self.vae_transparent_decoder = TransparentVAEDecoder(
                 load_torch_file(model_path),
-                device=comfy.model_management.get_torch_device(),
+                device=model_management.get_torch_device(),
                 dtype=(
                     torch.float16
-                    if comfy.model_management.should_use_fp16()
+                    if model_management.should_use_fp16()
                     else torch.float32
                 ),
             )

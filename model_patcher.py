@@ -28,7 +28,7 @@ class ModelPatcher:
         if self.size > 0:
             return self.size
         model_sd = self.model.state_dict()
-        self.size = comfy.model_management.module_size(self.model)
+        self.size = model_management.module_size(self.model)
         self.model_keys = set(model_sd.keys())
         return self.size
 
@@ -155,7 +155,7 @@ class ModelPatcher:
         return list(p)
 
     def get_key_patches(self, filter_prefix=None):
-        comfy.model_management.unload_model_clones(self)
+        model_management.unload_model_clones(self)
         model_sd = self.model_state_dict()
         p = {}
         for k in model_sd:
@@ -179,7 +179,7 @@ class ModelPatcher:
 
     def patch_model(self, device_to=None, patch_weights=True):
         for k in self.object_patches:
-            old = comfy.utils.set_attr(self.model, k, self.object_patches[k])
+            old = utils.set_attr(self.model, k, self.object_patches[k])
             if k not in self.object_patches_backup:
                 self.object_patches_backup[k] = old
 
@@ -198,14 +198,14 @@ class ModelPatcher:
                     self.backup[key] = weight.to(device=self.offload_device, copy=inplace_update)
 
                 if device_to is not None:
-                    temp_weight = comfy.model_management.cast_to_device(weight, device_to, torch.float32, copy=True)
+                    temp_weight = model_management.cast_to_device(weight, device_to, torch.float32, copy=True)
                 else:
                     temp_weight = weight.to(torch.float32, copy=True)
                 out_weight = self.calculate_weight(self.patches[key], temp_weight, key).to(weight.dtype)
                 if inplace_update:
-                    comfy.utils.copy_to_param(self.model, key, out_weight)
+                    utils.copy_to_param(self.model, key, out_weight)
                 else:
-                    comfy.utils.set_attr_param(self.model, key, out_weight)
+                    utils.set_attr_param(self.model, key, out_weight)
                 del temp_weight
 
             if device_to is not None:
@@ -238,15 +238,15 @@ class ModelPatcher:
                     if w1.shape != weight.shape:
                         print("WARNING SHAPE MISMATCH {} WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
                     else:
-                        weight += alpha * comfy.model_management.cast_to_device(w1, weight.device, weight.dtype)
+                        weight += alpha * model_management.cast_to_device(w1, weight.device, weight.dtype)
             elif patch_type == "lora": #lora/locon
-                mat1 = comfy.model_management.cast_to_device(v[0], weight.device, torch.float32)
-                mat2 = comfy.model_management.cast_to_device(v[1], weight.device, torch.float32)
+                mat1 = model_management.cast_to_device(v[0], weight.device, torch.float32)
+                mat2 = model_management.cast_to_device(v[1], weight.device, torch.float32)
                 if v[2] is not None:
                     alpha *= v[2] / mat2.shape[0]
                 if v[3] is not None:
                     #locon mid weights, hopefully the math is fine because I didn't properly test it
-                    mat3 = comfy.model_management.cast_to_device(v[3], weight.device, torch.float32)
+                    mat3 = model_management.cast_to_device(v[3], weight.device, torch.float32)
                     final_shape = [mat2.shape[1], mat2.shape[0], mat3.shape[2], mat3.shape[3]]
                     mat2 = torch.mm(mat2.transpose(0, 1).flatten(start_dim=1), mat3.transpose(0, 1).flatten(start_dim=1)).reshape(final_shape).transpose(0, 1)
                 try:
@@ -265,23 +265,23 @@ class ModelPatcher:
 
                 if w1 is None:
                     dim = w1_b.shape[0]
-                    w1 = torch.mm(comfy.model_management.cast_to_device(w1_a, weight.device, torch.float32),
-                                  comfy.model_management.cast_to_device(w1_b, weight.device, torch.float32))
+                    w1 = torch.mm(model_management.cast_to_device(w1_a, weight.device, torch.float32),
+                                  model_management.cast_to_device(w1_b, weight.device, torch.float32))
                 else:
-                    w1 = comfy.model_management.cast_to_device(w1, weight.device, torch.float32)
+                    w1 = model_management.cast_to_device(w1, weight.device, torch.float32)
 
                 if w2 is None:
                     dim = w2_b.shape[0]
                     if t2 is None:
-                        w2 = torch.mm(comfy.model_management.cast_to_device(w2_a, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w2_b, weight.device, torch.float32))
+                        w2 = torch.mm(model_management.cast_to_device(w2_a, weight.device, torch.float32),
+                                      model_management.cast_to_device(w2_b, weight.device, torch.float32))
                     else:
                         w2 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                          comfy.model_management.cast_to_device(t2, weight.device, torch.float32),
-                                          comfy.model_management.cast_to_device(w2_b, weight.device, torch.float32),
-                                          comfy.model_management.cast_to_device(w2_a, weight.device, torch.float32))
+                                          model_management.cast_to_device(t2, weight.device, torch.float32),
+                                          model_management.cast_to_device(w2_b, weight.device, torch.float32),
+                                          model_management.cast_to_device(w2_a, weight.device, torch.float32))
                 else:
-                    w2 = comfy.model_management.cast_to_device(w2, weight.device, torch.float32)
+                    w2 = model_management.cast_to_device(w2, weight.device, torch.float32)
 
                 if len(w2.shape) == 4:
                     w1 = w1.unsqueeze(2).unsqueeze(2)
@@ -303,19 +303,19 @@ class ModelPatcher:
                     t1 = v[5]
                     t2 = v[6]
                     m1 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                      comfy.model_management.cast_to_device(t1, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w1b, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w1a, weight.device, torch.float32))
+                                      model_management.cast_to_device(t1, weight.device, torch.float32),
+                                      model_management.cast_to_device(w1b, weight.device, torch.float32),
+                                      model_management.cast_to_device(w1a, weight.device, torch.float32))
 
                     m2 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                      comfy.model_management.cast_to_device(t2, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w2b, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w2a, weight.device, torch.float32))
+                                      model_management.cast_to_device(t2, weight.device, torch.float32),
+                                      model_management.cast_to_device(w2b, weight.device, torch.float32),
+                                      model_management.cast_to_device(w2a, weight.device, torch.float32))
                 else:
-                    m1 = torch.mm(comfy.model_management.cast_to_device(w1a, weight.device, torch.float32),
-                                  comfy.model_management.cast_to_device(w1b, weight.device, torch.float32))
-                    m2 = torch.mm(comfy.model_management.cast_to_device(w2a, weight.device, torch.float32),
-                                  comfy.model_management.cast_to_device(w2b, weight.device, torch.float32))
+                    m1 = torch.mm(model_management.cast_to_device(w1a, weight.device, torch.float32),
+                                  model_management.cast_to_device(w1b, weight.device, torch.float32))
+                    m2 = torch.mm(model_management.cast_to_device(w2a, weight.device, torch.float32),
+                                  model_management.cast_to_device(w2b, weight.device, torch.float32))
 
                 try:
                     weight += (alpha * m1 * m2).reshape(weight.shape).type(weight.dtype)
@@ -325,10 +325,10 @@ class ModelPatcher:
                 if v[4] is not None:
                     alpha *= v[4] / v[0].shape[0]
 
-                a1 = comfy.model_management.cast_to_device(v[0].flatten(start_dim=1), weight.device, torch.float32)
-                a2 = comfy.model_management.cast_to_device(v[1].flatten(start_dim=1), weight.device, torch.float32)
-                b1 = comfy.model_management.cast_to_device(v[2].flatten(start_dim=1), weight.device, torch.float32)
-                b2 = comfy.model_management.cast_to_device(v[3].flatten(start_dim=1), weight.device, torch.float32)
+                a1 = model_management.cast_to_device(v[0].flatten(start_dim=1), weight.device, torch.float32)
+                a2 = model_management.cast_to_device(v[1].flatten(start_dim=1), weight.device, torch.float32)
+                b1 = model_management.cast_to_device(v[2].flatten(start_dim=1), weight.device, torch.float32)
+                b2 = model_management.cast_to_device(v[3].flatten(start_dim=1), weight.device, torch.float32)
 
                 weight += ((torch.mm(b2, b1) + torch.mm(torch.mm(weight.flatten(start_dim=1), a2), a1)) * alpha).reshape(weight.shape).type(weight.dtype)
             else:
@@ -341,10 +341,10 @@ class ModelPatcher:
 
         if self.weight_inplace_update:
             for k in keys:
-                comfy.utils.copy_to_param(self.model, k, self.backup[k])
+                utils.copy_to_param(self.model, k, self.backup[k])
         else:
             for k in keys:
-                comfy.utils.set_attr_param(self.model, k, self.backup[k])
+                utils.set_attr_param(self.model, k, self.backup[k])
 
         self.backup = {}
 
@@ -354,6 +354,6 @@ class ModelPatcher:
 
         keys = list(self.object_patches_backup.keys())
         for k in keys:
-            comfy.utils.set_attr(self.model, k, self.object_patches_backup[k])
+            utils.set_attr(self.model, k, self.object_patches_backup[k])
 
         self.object_patches_backup = {}
