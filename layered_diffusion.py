@@ -10,11 +10,11 @@ from folder_paths import get_folder_paths
 from utils import load_torch_file
 from nodes_compositing import JoinImageWithAlpha
 from conds import CONDRegular
-from .lib_layerdiffusion.utils import (
+from lib_layerdiffusion.utils import (
     load_file_from_url,
     to_lora_patch_dict,
 )
-from .lib_layerdiffusion.models import TransparentVAEDecoder
+from lib_layerdiffusion.models import TransparentVAEDecoder
 
 if "layer_model" in folder_paths.folder_names_and_paths:
     layer_model_root = get_folder_paths("layer_model")[0]
