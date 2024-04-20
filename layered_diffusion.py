@@ -6,23 +6,23 @@ import copy
 from typing import Optional, List
 from dataclasses import dataclass
 
-import folder_paths
-import comfy.model_management
-import comfy.model_base
-import comfy.supported_models
-import comfy.supported_models_base
-from comfy.model_patcher import ModelPatcher
-from folder_paths import get_folder_paths
-from comfy.utils import load_torch_file
-from comfy_extras.nodes_compositing import JoinImageWithAlpha
-from comfy.conds import CONDRegular
-from .lib_layerdiffusion.utils import (
+# import folder_paths
+import totoro.model_management
+import totoro.model_base
+import totoro.supported_models
+import totoro.supported_models_base
+from totoro.model_patcher import ModelPatcher
+# from folder_paths import get_folder_paths
+from totoro.utils import load_torch_file
+# from totoro.nodes_compositing import JoinImageWithAlpha
+from totoro.conds import CONDRegular
+from lib_layerdiffusion.utils import (
     load_file_from_url,
     to_lora_patch_dict,
 )
-from .lib_layerdiffusion.models import TransparentVAEDecoder
-from .lib_layerdiffusion.attention_sharing import AttentionSharingPatcher
-from .lib_layerdiffusion.enums import StableDiffusionVersion
+from lib_layerdiffusion.models import TransparentVAEDecoder
+from lib_layerdiffusion.attention_sharing import AttentionSharingPatcher
+from lib_layerdiffusion.enums import StableDiffusionVersion
 
 if "layer_model" in folder_paths.folder_names_and_paths:
     layer_model_root = get_folder_paths("layer_model")[0]
@@ -31,9 +31,9 @@ else:
 load_layer_model_state_dict = load_torch_file
 
 
-# ------------ Start patching ComfyUI ------------
+# ------------ Start patching TotoroUI ------------
 def calculate_weight_adjust_channel(func):
-    """Patches ComfyUI's LoRA weight application to accept multi-channel inputs."""
+    """Patches TotoroUI's LoRA weight application to accept multi-channel inputs."""
 
     @functools.wraps(func)
     def calculate_weight(
@@ -68,7 +68,7 @@ def calculate_weight_adjust_channel(func):
                     print(
                         f"Merged with {key} channel changed from {weight.shape} to {new_shape}"
                     )
-                    new_diff = alpha * comfy.model_management.cast_to_device(
+                    new_diff = alpha * totoro.model_management.cast_to_device(
                         w1, weight.device, weight.dtype
                     )
                     new_weight = torch.zeros(size=new_shape).to(weight)
@@ -95,7 +95,7 @@ ModelPatcher.calculate_weight = calculate_weight_adjust_channel(
     ModelPatcher.calculate_weight
 )
 
-# ------------ End patching ComfyUI ------------
+# ------------ End patching TotoroUI ------------
 
 
 class LayeredDiffusionDecode:
@@ -137,7 +137,7 @@ class LayeredDiffusionDecode:
     def decode(self, samples, images, sd_version: str, sub_batch_size: int):
         """
         sub_batch_size: How many images to decode in a single pass.
-        See https://github.com/huchenlei/ComfyUI-layerdiffuse/pull/4 for more
+        See https://github.com/huchenlei/TotoroUI-layerdiffuse/pull/4 for more
         context.
         """
         sd_version = StableDiffusionVersion(sd_version)
@@ -154,10 +154,10 @@ class LayeredDiffusionDecode:
             )
             self.vae_transparent_decoder[sd_version] = TransparentVAEDecoder(
                 load_torch_file(model_path),
-                device=comfy.model_management.get_torch_device(),
+                device=totoro.model_management.get_torch_device(),
                 dtype=(
                     torch.float16
-                    if comfy.model_management.should_use_fp16()
+                    if totoro.model_management.should_use_fp16()
                     else torch.float32
                 ),
             )
@@ -353,12 +353,12 @@ class LayeredDiffusionBase:
 
 def get_model_sd_version(model: ModelPatcher) -> StableDiffusionVersion:
     """Get model's StableDiffusionVersion."""
-    base: comfy.model_base.BaseModel = model.model
-    model_config: comfy.supported_models.supported_models_base.BASE = base.model_config
-    if isinstance(model_config, comfy.supported_models.SDXL):
+    base: totoro.model_base.BaseModel = model.model
+    model_config: totoro.supported_models.supported_models_base.BASE = base.model_config
+    if isinstance(model_config, totoro.supported_models.SDXL):
         return StableDiffusionVersion.SDXL
     elif isinstance(
-        model_config, (comfy.supported_models.SD15, comfy.supported_models.SD20)
+        model_config, (totoro.supported_models.SD15, totoro.supported_models.SD20)
     ):
         # SD15 and SD20 are compatible with each other.
         return StableDiffusionVersion.SD1x
